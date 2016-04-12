@@ -1,0 +1,1 @@
+The 'id' element in both the tsv data, and topojson file are both indeed fips codes, the first two digits representing fips state, the last three fips county. This value is not zero padded, so that may cause some confusion.
