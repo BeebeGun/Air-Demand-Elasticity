@@ -60,10 +60,15 @@ path:hover {
 </style>
 <body>
 <div id="airportSelect"></div>
+
+<!-- Checking to see if we can get an output from Python -->
+<div id="pythonOutput"></div>
+
 <script type="text/javascript" src="../lib/d3/d3.v3.min.js"></script>
 <script type="text/javascript" src="../lib/topojson.v1.min.js"></script>
 <script type="text/javascript" src="../lib/d3-queue.min.js"></script>
 <script type="text/javascript" src="../lib/d3-tip.js"></script>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.5/jquery.min.js"></script>
 
 <script>
 
@@ -147,6 +152,47 @@ d3.json("mapFiles/airports.json", function(error, data) {
 
 
 //d3.json("mapFiles/us.json", function(error, topology) {
+
+alert("Posting")
+httpPost("nnet", {"array": [94,12266,12339,634,2015]}, exampleCallback, "PROOF")
+alert("Posted")
+
+function exampleCallback(data, carry) {
+    alert(data)
+    alert(carry)
+}
+
+function httpGet(url, callback, carryout) {
+    httpRequest("GET", url, null, callback, carryout);
+}
+
+function httpPost(url, data, callback, carryout) {
+    httpRequest("POST", url, data, callback, carryout);
+}
+
+function httpRequest(request, url, data, callback, carryout) {
+    var xmlHttp = new XMLHttpRequest();
+    xmlHttp.open(request, url, true);
+    xmlHttp.onreadystatechange = function() {
+        if (xmlHttp.readyState == 4) {
+            if (xmlHttp.status != 200) {
+                if (xmlHttp.status == 307) {
+                    var uri = xmlHttp.getResponseHeader('Location');
+                    httpGet(uri, function(){});
+                } else {
+                    alert("Error: "+xmlHttp.status+": "+xmlHttp.statusText);
+                    callback(undefined, carryout);
+                }
+            } else {
+                callback(xmlHttp.responseText, carryout);
+            }
+        }
+    };
+    xmlHttp.send(data === null ? data : JSON.stringify(data));
+}
+
+
+
 
 function ready(error, topology) {  
   if (error) throw error;

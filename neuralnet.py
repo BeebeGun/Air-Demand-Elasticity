@@ -61,16 +61,19 @@ def serialize(net):
     s = joblib.dump(net, 'serializednetwork/nn.pkl')
     return s
 
-def predict(serial, data):
+def predict(data):
+    print("Predicting")
     net = joblib.load('serializednetwork/nn.pkl')
     return net.activate(data)
 
-if __name__ == '__main__':
+#if __name__ == '__main__':
+def nnetBegin():
+    #global nn
     print("Reading data...")
     data = readdata()
     print("Building network...")
     network = buildnetwork(data)
     print("Serializing network...")
     nn = serialize(network)
-    print("Predicting...")
-    print(predict(nn, [94,12266,12339,634,2015]))
+    #print("Predicting...")
+    #print(predict(nn, [94,12266,12339,634,2015]))
