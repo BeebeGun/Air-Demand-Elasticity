@@ -24,7 +24,7 @@ def readdata():
     print(crude)
 
     #number of inputs, number of outputs
-    ds = SupervisedDataSet(5,1)
+    ds = SupervisedDataSet(6,1)
 
     tf = open('data/2015.csv','r')
 
@@ -33,8 +33,8 @@ def readdata():
 
     for line in tf.readlines():
         data = [x for x in line.strip().split(',') if x != '']
-        if float(data[1]) != 0:
-            indata =  (float(data[3]), float(data[4]), float(data[6]), float(data[7]), crude[int(data[7])-1])
+        if float(data[1]) >= 40:
+            indata =  (float(data[3]), float(data[4]), float(data[5]), float(data[7]), float(data[8]), crude[int(data[8])-1])
             outdata = (float(data[2])/float(data[1]))
             ds.addSample(indata,outdata)
 

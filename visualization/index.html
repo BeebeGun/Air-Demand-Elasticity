@@ -153,13 +153,12 @@ d3.json("mapFiles/airports.json", function(error, data) {
 
 //d3.json("mapFiles/us.json", function(error, topology) {
 
-alert("Posting")
-httpPost("nnet", {"array": [94,12266,12339,634,2015]}, exampleCallback, "PROOF")
-alert("Posted")
+// CALL SOMETHING LIKE THIS TO SEND DATA TO THE NEURAL NETWORK
+httpPost("nnet", {"array": [844,12266,12339,674,2015,9]}, exampleCallback)
 
 function exampleCallback(data, carry) {
-    alert(data)
-    alert(carry)
+    alert(data) // The data being output by the NN
+    //alert(carry) // We don't really need this
 }
 
 function httpGet(url, callback, carryout) {
