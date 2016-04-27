@@ -1,45 +1,58 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="../lib/d3.slider.css">
 <style>
 
-/*path {
-  fill: #ccc;
-  stroke: #fff;
-  stroke-width: .5px;
-}
-*/
 
-path:hover {
-  fill: red;
-}
-
-.route { 
-  stroke: #000;
-  fill: #000;
-  stroke-width: 0.8px;
- }
-
-.counties {
-  fill: none;
-}
-
-.states {
-  fill: none;
-  stroke: #fff;
+path {
   stroke-linejoin: round;
 }
 
+.land-glow {
+  fill-opacity: .2;
+  filter: url(#blur);
+}
 
-.q0-9 { fill:rgb(247,251,255); }
-.q1-9 { fill:rgb(222,235,247); }
-.q2-9 { fill:rgb(198,219,239); }
-.q3-9 { fill:rgb(158,202,225); }
-.q4-9 { fill:rgb(107,174,214); }
-.q5-9 { fill:rgb(66,146,198); }
-.q6-9 { fill:rgb(33,113,181); }
-.q7-9 { fill:rgb(8,81,156); }
-.q8-9 { fill:rgb(8,48,107); }
+.land-fill {
+  fill: #ddd; /*ccc*/
+}
 
+.state-boundary {
+  fill: none;
+  stroke: #fff;
+  stroke-width: .70px;
+}
+
+.county-boundary {
+  fill: none;
+}`
+
+
+.county-boundary {
+  stroke: #777;
+  stroke-width: .35px;
+}
+
+.bubble {
+  fill-opacity: .5;
+  stroke: none; /*#fff*/
+  stroke-width: none; /*.5px;*/
+}
+
+.bubble :hover {
+  stroke: #000;
+}
+
+.legend circle {
+  fill: none;
+  stroke: #ccc;
+}
+
+.legend text {
+  fill: #777;
+  font: 10px sans-serif;
+  text-anchor: middle;
+}
 
   div.d3-tip {
     position: absolute;     
@@ -59,16 +72,22 @@ path:hover {
 
 </style>
 <body>
-<div id="airportSelect"></div>
+<img src="./icons/airport.svg", width="30", height="30">
+<div id="airportSelect" style="margin-bottom:15px;margin-top:15px"></div>
+<img src="./icons/year.svg", width="30", height="30"> Year:
+<div id="slider" class="slider" style="margin-bottom:30px;margin-top:7px;"></div>
+<img src="./icons/month.svg", width="30", height="30"> Month:
+<div id="slider2" class="slider" style="margin-bottom:30px;margin-top:7px;"></div>
+<img src="./icons/fuel.svg", width="30", height="30"> Projected Fuel Price:
+<div id="slider3" class="slider" style="margin-bottom:30px;margin-top:7px;"></div>
 
-<!-- Checking to see if we can get an output from Python -->
-<div id="pythonOutput"></div>
+
 
 <script type="text/javascript" src="../lib/d3/d3.v3.min.js"></script>
 <script type="text/javascript" src="../lib/topojson.v1.min.js"></script>
 <script type="text/javascript" src="../lib/d3-queue.min.js"></script>
 <script type="text/javascript" src="../lib/d3-tip.js"></script>
-<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.5/jquery.min.js"></script>
+<script type="text/javascript", src="../lib/d3.slider.js"></script>
 
 <script>
 
@@ -78,36 +97,185 @@ var width = 960,
 var rateById = d3.map();
 
 var projection = d3.geo.albers(); //albersUsa projection will show HI and AL but the routes look strange
+    projection
+    .scale(1000);
+
 var path = d3.geo.path().projection(projection);
-
-
-var quantize = d3.scale.quantize()
-    .domain([0, .15])
-    .range(d3.range(9).map(function(i) { return "q" + i + "-9"; }));
-
 
 var svg = d3.select("body").append("svg")
     .attr("width", width)
     .attr("height", height);
 
+var rscale = d3.scale.linear()
+  .domain([0,1])
+  .range([5,30]);
 
-//this bit loads in all possible airports in the US 
-d3.json("mapFiles/airports.json", function(error, data) {
+
+var defs = svg.append("defs");
+
+defs.append("filter")
+    .attr("id", "blur")
+  .append("feGaussianBlur")
+    .attr("stdDeviation", 5);
+
+
+var color = d3.scale.linear()
+    .domain([-1,-0.666,-0.333,0,0.333,0.666,1])
+    .range(["#b2182b","#ef8a62","#fddbc7","#f7f7f7","#d1e5f0","#67a9cf","#2166ac"]);
+    //dark red to light red to mostly white to light blue to dark blue
+
+color.clamp(true); //make domain values outside domain go to closest endpoint
+
+
+var userMonth = 0
+var userYear = 0
+var fuelNew = 1
+
+var yearSlider = d3.slider().axis(true).min(2005).max(2015).step(1)
+.value(2010)
+.on("slide", function(evt, value) {
+    userYear = value
+  });
+
+
+var monthSlider = d3.slider().axis(true).min(1).max(12).step(1)
+.value(6)
+.on("slide", function(evt, value) {
+    userMonth = value
+  });
+
+var fuelSlider = d3.slider().axis(true).min(0).max(100)
+.value(50)
+.on("slide", function(evt, value) {
+    fuelNew = value
+  });
+
+
+
+var sliderdiv = d3.select('#slider').call(yearSlider);
+var sliderdiv2 = d3.select('#slider2').call(monthSlider);
+var sliderdiv3 = d3.select('#slider3').call(fuelSlider);
+
+
+function setFuelPrice(){
+  fuelNew  = document.getElementById("myNumber").value
+}
+
+
+//SETUP FOR IF WE GO WITH GRADIENTS
+// var gradientScale = d3.scale.linear()
+//     .domain([])
+//     .range([]);
+
+// for (var i = 0; i < colorRange.length; i++) {
+//    var gradient = defs.append("radialGradient")
+//       .attr("id", "radial-gradient" + i);
+
+//   gradient.append("stop")
+//       .attr("offset", "0%")
+//       .attr("stop-color", colorRange[i])
+//       .attr("stop-opacity", 1);
+
+//   gradient.append("stop")
+//       .attr("offset", "100%")
+//       .attr("stop-color", colorRange[i])
+//       .attr("stop-opacity", 0);
+
+ 
+
+d3.json("mapFiles/us.json", function(error, us) {
   if (error) throw error;
 
-  var filterIATA = ["ATL", "JFK", "ORD", "SFO", "LAX", "SLC", "MSP", "DTW", "HOU", "SEA", "HNL", "ANC", "DAL", "LGA", "MIA"]
+  defs.append("path")
+      .datum(topojson.feature(us, us.objects.land))
+      .attr("id", "land")
+      .attr("d", path);
 
+  svg.append("use")
+      .attr("class", "land-glow")
+      .attr("xlink:href", "#land");
+
+  svg.append("use")
+      .attr("class", "land-fill")
+      .attr("xlink:href", "#land");
+
+  svg.append("path")
+      .datum(topojson.mesh(us, us.objects.counties, function(a, b) {
+        return a !== b // a border between two counties
+            && (a.id === 53000 || b.id === 5300 // where a and b are in puget sound
+              || a.id % 1000 && b.id % 1000) // or a and b are not in a lake
+            && !(a.id / 1000 ^ b.id / 1000); // and a and b are in the same state
+      }))
+      .attr("class", "county-boundary")
+      .attr("d", path);
+
+  svg.append("path")
+      .datum(topojson.mesh(us, us.objects.states, function(a, b) {
+        return a !== b; // a border between two states
+      }))
+      .attr("class", "state-boundary")
+      .attr("d", path);
+
+
+var filterIATA = {"origin": []};
+
+  d3.csv("mapFiles/cleanedorgdest.csv", function(error, filterData) {
+    if (error) throw error; 
+    filterData.forEach(function(d){
+      filterIATA.origin.push(d.ORIG);
+    });
+
+
+  var IDmap = {};
+  // get mapping of iata code to id
+  d3.csv("../data/airportids.csv", function(error, mapdata) {
+    if (error) throw error; 
+    mapdata.forEach(function(d){
+      //console.log(d['ID']);
+      IDmap[d['IATA']] = d['ID'];
+      /*
+      IDmap.push({
+        key:   d.IATA,
+        value: d.ID
+      });
+      */
+    });
+  });
+ 
+  var dist = {};
+  // get mapping of iata code to id
+  d3.csv("../data/cleanedorgdest.csv", function(error, distdata) {
+    if (error) throw error; 
+    distdata.forEach(function(d){
+      dist[d['ORG'].concat(d['DEST'])] = d['DIST'];
+      /*
+      IDmap.push({
+        key:   d.IATA,
+        value: d.ID
+      });
+      */
+    });
+  });
+
+
+//this bit loads in all possible airports in the US 
+  d3.json("mapFiles/airports.json", function(error, data) {
+  if (error) throw error;
+
+ // var filterIATA = ["ATL", "JFK", "ORD", "SFO", "LAX", "SLC", "MSP", "DTW", "HOU", "SEA", "HNL", "ANC", "DAL", "LGA", "MIA"]
+
+  
   //checks to see if part of the analyzed airports and creates citiesData array from the filtered results
   citiesData = {"data" : []};
   data.forEach(function(d) {
-    if (filterIATA.indexOf(d.iata) > -1) {
+    if (filterIATA.origin.indexOf(d.iata) > -1) {
+      if(+d.lon > -1000) { //condition weeds out the airports that didnt have available lon/lat data
       citiesData.data.push({"iata": d.iata,
                             "lon": +d.lon,
                             "lat": +d.lat});
+      }
     }
   }); 
-
-
 
   var myDiv = document.getElementById("airportSelect");
 
@@ -122,97 +290,36 @@ d3.json("mapFiles/airports.json", function(error, data) {
   firstOption.text = "Airport"; 
   selectList.appendChild(firstOption);
 
-  citiesData.data.forEach(function(d) {
+//create a sorted list of airports to use for the dropdown list
+  sortedList = []
+  citiesData.data.forEach(function(d){sortedList.push(d.iata)});
+  sortedList.sort();
+
+  //read in the airports of the sortedList as an element of a drop down selection
+  sortedList.forEach(function(d) {
       var option = document.createElement("option");
-      option.value = d.iata;
-      option.text = d.iata;
+      option.value = d;
+      option.text = d;
       selectList.appendChild(option);
   });
 
-  var e = document.getElementById("mySelect");
-  var strUser = e.options[e.selectedIndex].value;
-
-
+    var e = document.getElementById("mySelect");
+    var f = document.getElementById("myNumber");
+    var strUser = e.options[e.selectedIndex].value;
 
 
 //object that contains the airport as the keys in the nested array
   airportData = {}
   data.forEach(function(d) {
-      if (filterIATA.indexOf(d.iata) > -1) {
+      if (filterIATA.origin.indexOf(d.iata) > -1) {
         var airport = d.iata
-        airportData[airport] = {"lon" : +d.lon,  "lat" : +d.lat};
+        var connections = []
+        filterData.forEach(function(D) {if (D.ORIG==airport) {connections.push(D.DEST)};});
+        airportData[airport] = {"lon" : +d.lon,  "lat" : +d.lat, "connections": connections};
       }
     }); 
 
 
- d3_queue.queue()
-    .defer(d3.json, "mapFiles/us.json")
-    .defer(d3.tsv, "mapFiles/unemployment.tsv", function(d) { rateById.set(d.id, +d.rate); })
-    .await(ready);
-
-
-//d3.json("mapFiles/us.json", function(error, topology) {
-
-// CALL SOMETHING LIKE THIS TO SEND DATA TO THE NEURAL NETWORK
-httpPost("nnet", {"array": [844,12266,12339,674,2015,9]}, exampleCallback)
-
-function exampleCallback(data, carry) {
-    alert(data) // The data being output by the NN
-    //alert(carry) // We don't really need this
-}
-
-function httpGet(url, callback, carryout) {
-    httpRequest("GET", url, null, callback, carryout);
-}
-
-function httpPost(url, data, callback, carryout) {
-    httpRequest("POST", url, data, callback, carryout);
-}
-
-function httpRequest(request, url, data, callback, carryout) {
-    var xmlHttp = new XMLHttpRequest();
-    xmlHttp.open(request, url, true);
-    xmlHttp.onreadystatechange = function() {
-        if (xmlHttp.readyState == 4) {
-            if (xmlHttp.status != 200) {
-                if (xmlHttp.status == 307) {
-                    var uri = xmlHttp.getResponseHeader('Location');
-                    httpGet(uri, function(){});
-                } else {
-                    alert("Error: "+xmlHttp.status+": "+xmlHttp.statusText);
-                    callback(undefined, carryout);
-                }
-            } else {
-                callback(xmlHttp.responseText, carryout);
-            }
-        }
-    };
-    xmlHttp.send(data === null ? data : JSON.stringify(data));
-}
-
-
-
-
-function ready(error, topology) {  
-  if (error) throw error;
-
-    projection
-    .scale(1000);
-
-
-
-  svg.append("g")
-      .attr("class", "counties")
-    .selectAll("path")
-      .data(topojson.feature(topology, topology.objects.counties).features)
-    .enter().append("path")
-     .attr("class", function(d) { return quantize(rateById.get(d.id)); })
-      .attr("d", path);
-
-  svg.append("path")
-      .datum(topojson.mesh(topology, topology.objects.states, function(a, b) { return a !== b; }))
-      .attr("class", "states")
-      .attr("d", path);
 
 
 //plot the airport coordinates as circles
@@ -283,11 +390,67 @@ var div = d3.select("body").append("div")
       return function(t) { return interpolate(t); };
   };
 
-function updateRoutes(selection) {
+var legend = svg.append("g")
+    .attr("class", "legend")
+    .attr("transform", "translate(" + (width - 50) + "," + (height - 20) + ")")
+  .selectAll("g")
+    .data([0.25, .75, 1])
+  .enter().append("g");
 
+legend.append("circle")
+    .attr("cy", function(d) { return -rscale(d); })
+    .attr("r", rscale);
+
+legend.append("text")
+    .attr("y", function(d) { return -2 * rscale(d); })
+    .attr("dy", "1.3em")
+    .text(d3.format("%"));
+
+
+
+function exampleCallback(data, carry) {
+    return (data) // The data being output by the NN
+    //alert(carry) // We don't really need this
+}
+
+function httpGet(url, callback, carryout) {
+    httpRequest("GET", url, null, callback, carryout);
+}
+
+function httpPost(url, data, callback, carryout) {
+    httpRequest("POST", url, data, callback, carryout);
+}
+
+function httpRequest(request, url, data, callback, carryout) {
+    var xmlHttp = new XMLHttpRequest();
+    xmlHttp.open(request, url, true);
+    xmlHttp.onreadystatechange = function() {
+        if (xmlHttp.readyState == 4) {
+            if (xmlHttp.status != 200) {
+                if (xmlHttp.status == 307) {
+                    var uri = xmlHttp.getResponseHeader('Location');
+                    httpGet(uri, function(){});
+                } else {
+                    alert("Error: "+xmlHttp.status+": "+xmlHttp.statusText);
+                    callback(undefined, carryout);
+                }
+            } else {
+                callback(xmlHttp.responseText, carryout);
+            }
+        }
+    };
+    xmlHttp.send(data === null ? data : JSON.stringify(data));
+}
+
+
+
+
+function updateRoutes(selection) {
+  console.log(fuelNew)
    links = [];
 
     citiesData.data.forEach(function(d) {
+      if (airportData[selection].connections.indexOf(d.iata) > -1){
         links.push({
           type : "LineString",
           coordinates: [
@@ -295,6 +458,7 @@ function updateRoutes(selection) {
             [d.lon, d.lat]
           ]
         });
+      }
     }); 
 
     // Standard enter / update 
@@ -323,12 +487,152 @@ function updateRoutes(selection) {
 
     //exit
     pathArcs.exit().remove();
+
+
+    d3.csv("mapFiles/output.csv", function(error, demands) {
+      if (error) throw error; 
+
+    //demands = ["ATL", "JFK", "SFO", "MSP"];
+
+
+      // demandPoints = [];
+      // demands.forEach(function(d) {
+      //     demandPoints.push({"iata" : d.DEST, 
+      //     "lon" : citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d.DEST)].lon, 
+      //     "lat" : citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d.DEST)].lat,
+      //     "demand" : +d.DEMAND });
+      //   });
+
+
+
+    var radialGradient = svg.append("defs")
+        .append("radialGradient")
+        .attr("id", "radial-gradient")
+        .append("stop")
+        .attr("offset", "50%")
+        .attr("stop-color", "red")
+        .append("stop")
+        .attr("offset", "100%")
+        .attr("stop-color", "#fff");
+
+
+    // console.log(airportData[selection].connections)
+
+    demands = {"data": []}
+
+    airportData[selection].connections.forEach(function(d) {
+      //all of the cities connected to the selected airport.
+
+      // step 1: get the origin airport id code
+      orgairport = parseInt(IDmap[selection])
+
+      //step 2: get the destination airport id code
+      destairport = parseInt(IDmap[d])
+
+      //step 3: get distance
+      distance = parseInt(dist[selection.concat(d)])
+
+      //step 4: get year
+      curyear = 2016
+
+      //step 5: get month
+      curmonth = 4
+
+      //step 6: get fuel price TODO - DO THIS
+
+      var dmd = Math.random()//httpPost("nnet", {"array": [distance,orgairport,destairport,curyear,curmonth,fuelNew]}, exampleCallback, dmd)
+
+      demands.data.push([d, dmd])
+
+      // var dmd = httpPost("nnet", {"array": [distance,orgairport,destairport,curyear,curmonth,fuelNew]}, exampleCallback)
+
+      // httpPost("nnet", {"array": [distance,orgairport,destairport,userYear,userMonth,9]}, exampleCallback)
+
+    });
+    // distance, origin, destination, year, month, fuel price
+    // httpPost("nnet", {"array": [844,12266,12339,674,2015,9]}, exampleCallback)
+
+
+    // var radialGradient = svg.select("defs")
+    //     .selectAll("radialGradient").data(demandPoints).enter()
+    //     .append("radialGradient")
+    //     .append("stop")
+    //     .attr("offset", "0%")
+    //     .attr("stop-color", "red")
+    //     .append("stop")
+    //     .attr("offset", "100%")
+    //     .attr("stop-color", "#fff")
+    //     .attr('id', function(d) {return "radial-gradient"});
+      function CrossPriceElasticity(demandNew){ 
+          demandOld = 0.5 //use the userYear and userMonth to index the proper values
+          fuelOld = 34.6
+          cpe = ((demandNew-demandOld)/demandOld)/((fuelNew-fuelOld)/fuelOld)
+          return cpe
+          }
+
+      console.log(CrossPriceElasticity(.78))
+      console.log(color(CrossPriceElasticity(.78)))
+
+      // svg.selectAll(".bubble")
+      // .data(demandPoints)
+      // .enter().append("circle")
+      // .attr("class", "bubble")
+      // .attr("transform", function(d) {
+      // return "translate(" + projection([
+      //   d.lon, //longitude
+      //   d.lat //latitude 
+      //   ]) + ")"})
+      // .attr("r", function(d) {return rscale(d.demand);})
+      // .style("fill", function(d) {return color(CrossPriceElasticity(d.demand));});
+      //   });
+
+    temparr = {"data" : []};
+    demands.data.forEach(function(d) {
+      if (filterIATA.origin.indexOf(d[0]) > -1) {
+        // if(citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lon > -1000) { //condition weeds out the airports that didnt have available lon/lat data
+        temparr.data.push({"iata": d[0],
+                            "demand": +d[1]});
+      // }
+    }
+  }); 
+
+    console.log(temparr)
+
+    demandPoints = [];
+      temparr.data.forEach(function(d) {
+          demandPoints.push({"iata" : d[0], 
+          "lon" : (function(d) {
+            if (citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lon > -1000) {
+              return +citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lon}
+            }),
+          "lat" : (function(d) {
+            if (citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lat > -1000) {
+              return +citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lat}
+            }),
+          "demand" : +d[1] });
+        });
+
+
+    svg.selectAll(".bubble")
+      .data(demandPoints)
+      .enter().append("circle")
+      .attr("class", "bubble")
+      .attr("transform", function(d) {
+      return "translate(" + projection([
+        d.lon, //longitude
+        d.lat //latitude 
+        ]) + ")"})
+      .attr("r", function(d) {return rscale(d.demand);})
+      .style("fill", function(d) {return color(CrossPriceElasticity(d.demand));});
+        });
+
+
 } 
 
 function clearRoutes() {
     svg.selectAll('arc').remove();
+    svg.selectAll('.bubble').remove();
 }
-
 
 d3.select(e)
   .on('change', function() {
@@ -339,7 +643,11 @@ d3.select(e)
 
 
 
-};
 });
+});
+});
+
+
+
 
 </script>

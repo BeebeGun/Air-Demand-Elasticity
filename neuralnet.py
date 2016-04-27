@@ -30,35 +30,47 @@ def readdata():
     ds = SupervisedDataSet(6,1)
 
     # start year loop here
-    for i in range(0,6):
+    # for i in range(0,6):
 
-        filename = 'data/201' + str(i) + '.csv'
+        # filename = 'data/201' + str(i) + '.csv'
 
-        tf = open(filename,'r')
+    filename = 'data/masterdata.csv'
 
-        # skip headers
-        tf.readline()
+    tf = open(filename,'r')
 
-        for line in tf.readlines():
-            data = [x for x in line.strip().split(',') if x != '']
-            if float(data[1]) >= 40:
-                indata =  (float(data[3]), float(data[4]), float(data[5]), float(data[7]), float(data[8]), crude[int(data[7])-2010][int(data[8])])
-                outdata = (float(data[2])/float(data[1]))
-                ds.addSample(indata,outdata)
+    # skip headers
+    tf.readline()
+
+    for line in tf.readlines():
+        data = [x for x in line.strip().split(',') if x != '']
+        if float(data[1]) >= 40:
+            # distance, origin, destination, year, month, fuel price
+            indata =  [float(data[3])/6089, float(data[4])/16647, float(data[5])/16647, float(data[7])/2015, float(data[8])/12, crude[int(data[7])-2010][int(data[8])]/109.53]
+            outdata = [float(data[2])/float(data[1])]
+            ds.addSample(indata,outdata)
 
     # end year loop here
-    print(len(ds))
+
     return ds
 
 def buildnetwork(ds):
 
     # number of inputs, hidden neurons, number of outputs
+    tstdata, trndata = ds.splitWithProportion( 0.25 )
     n = buildNetwork(ds.indim, 100, ds.outdim, recurrent=False)
+    n.randomize()
     print("Building Trainer...")
-    t = BackpropTrainer(n,learningrate=0.01,momentum=0.5,verbose=True)
+    # t = BackpropTrainer(n,learningrate=0.01,momentum=0.01,verbose=True)
+    # t.trainOnDataset(tstdata, 3)
+
+    t = BackpropTrainer(n, ds)
+    for epoch in range(0, 1000):                                                                   
+        error = t.train()
+        if error < 0.001:
+            break  
 
     # print("Cross Validator Initiating...")
-    # cv=CrossValidator(trainer=t, dataset=ds, n_folds=5)
+    # cv=CrossValidator(trainer=t, dataset=ds, n_folds=10)
     # print("Cross Validating...")
     # CrossValidator.validate(cv)
 
@@ -79,11 +91,12 @@ def predict(data):
 #if __name__ == '__main__':
 def nnetBegin():
     #global nn
-    print("Reading data...")
-    data = readdata()
-    print("Building network...")
-    network = buildnetwork(data)
-    print("Serializing network...")
-    nn = serialize(network)
+    # print("Reading data...")
+    # data = readdata()
+    # print("Building network...")
+    # network = buildnetwork(data)
+    # print("Serializing network...")
+    # nn = serialize(network)
+    net = net = joblib.load('serializednetwork/nn.pkl')
     #print("Predicting...")
     #print(predict(nn, [94,12266,12339,634,2015]))
