@@ -16,12 +16,17 @@ class MyHandler(BaseHTTPRequestHandler):
         try:
             if self.path == '/':
                 self.path = "/index.html"
-            f = open(curdir + sep + self.path)
-            out = f.read()
+            #f = open(curdir + sep + self.path)
+            #out = f.read()
             ext = self.path.split('.')
             ext = ext[len(ext)-1]
+            """
             if (ext != '.ico'):
                 out = bytes(out, 'utf-8')
+            """
+            read = 'rb'
+            with open(curdir + sep + self.path, read) as f:
+                out = f.read()
             self.gen_headers(ext)
             self.wfile.write(out)
             f.close()
@@ -36,7 +41,11 @@ class MyHandler(BaseHTTPRequestHandler):
             contentType = 'text/css'
         elif (ext == "js"):
             contentType = 'application/javascript'
+        elif (ext == "svg"):
+            contentType = 'image/svg+xml'
         self.send_header('Content-type', contentType)
+        if (ext == "svg"):
+            self.send_header('Vary', 'Accept-Encoding')
         self.end_headers()
 
     def do_POST(self):

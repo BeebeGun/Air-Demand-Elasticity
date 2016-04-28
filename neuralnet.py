@@ -85,7 +85,7 @@ def serialize(net):
 
 def predict(data):
     print("Predicting")
-    net = joblib.load('serializednetwork/nn.pkl')
+    net = joblib.load('serializednetwork/nn2.pkl')
     return net.activate(data)
 
 #if __name__ == '__main__':
@@ -97,6 +97,6 @@ def nnetBegin():
     # network = buildnetwork(data)
     # print("Serializing network...")
     # nn = serialize(network)
-    net = net = joblib.load('serializednetwork/nn.pkl')
+    net = net = joblib.load('serializednetwork/nn2.pkl')
     #print("Predicting...")
     #print(predict(nn, [94,12266,12339,634,2015]))
