@@ -107,7 +107,7 @@ var svg = d3.select("body").append("svg")
     .attr("height", height);
 
 var rscale = d3.scale.linear()
-  .domain([0,1])
+  //.domain([0,1])
   .range([5,30]);
 
 
@@ -227,11 +227,13 @@ var filterIATA = {"origin": []};
 
 
   var IDmap = {};
+  var IATAmap = {};
   // get mapping of iata code to id
   d3.csv("../data/airportids.csv", function(error, mapdata) {
     if (error) throw error; 
     mapdata.forEach(function(d){
       IDmap[d['IATA']] = d['ID'];
+      IATAmap[d['ID']] = d['IATA'];
     });
   });
  
@@ -386,43 +388,96 @@ var div = d3.select("body").append("div")
       return function(t) { return interpolate(t); };
   };
 
-var legend = svg.append("g")
-    .attr("class", "legend")
-    .attr("transform", "translate(" + (width - 50) + "," + (height - 20) + ")")
-  .selectAll("g")
-    .data([0.25, .75, 1])
-  .enter().append("g");
+// var legend = svg.append("g")
+//     .attr("class", "legend")
+//     .attr("transform", "translate(" + (width - 50) + "," + (height - 20) + ")")
+//   .selectAll("g")
+//     .data([0.25, .75, 1])
+//   .enter().append("g");
 
-legend.append("circle")
-    .attr("cy", function(d) { return -rscale(d); })
-    .attr("r", rscale);
+// legend.append("circle")
+//     .attr("cy", function(d) { return -rscale(d); })
+//     .attr("r", rscale);
 
-legend.append("text")
-    .attr("y", function(d) { return -2 * rscale(d); })
-    .attr("dy", "1.3em")
-    .text(d3.format("%"));
+// legend.append("text")
+//     .attr("y", function(d) { return -2 * rscale(d); })
+//     .attr("dy", "1.3em")
+//     .text(d3.format("%"));
 
 
 
 function exampleCallback(data, carry) {
     data = JSON.parse(data)
     var demandnew = parseFloat(data.predicition)
+
+    done = carry['done']
+
     // should take in old fuel
     oldfuel = fuels[String(carry['userMonth']).concat(String(carry['userYear']))]
-    console.log(oldfuel)
     // THIS IS THE OLD DEMAND
+    newcarry = [demandnew, oldfuel, carry['destairport'], done]
     if (carry['distance'] > 0) {
-      httpPost("nnet", {"array": [parseFloat(carry['distance'])/6089,parseFloat(carry['orgairport'])/16647,parseFloat(carry['destairport'])/16647,parseFloat(carry['userYear'])/2016,parseFloat(carry['userMonth'])/12,parseFloat(oldfuel)/200]}, anothercallback, demandnew)
+      httpPost("nnet", {"array": [parseFloat(carry['distance'])/6089,parseFloat(carry['orgairport'])/16647,parseFloat(carry['destairport'])/16647,parseFloat(carry['userYear'])/2016,parseFloat(carry['userMonth'])/12,parseFloat(oldfuel)/200]}, anothercallback, newcarry)
     }
     
 }
 
+bubbleArray = {"data" : []}
+
 function anothercallback(data, carry) {
   data = JSON.parse(data)
   var demandold = parseFloat(data.predicition) 
-  var demandnew = carry
+  var demandnew = carry[0]
+  var fuelold = parseFloat(carry[1])
+  var destairport = IATAmap[carry[2]]
+  var done = carry[3]
 
-  console.log(CrossPriceElasticity(demandold, demandnew))
+  var cpe = CrossPriceElasticity(demandold, demandnew, fuelold)
+
+  console.log(rscale(demandnew*100))
+
+  bubbleArray.data.push({destairport, cpe, demandnew})
+
+  if (done) {
+    drawBubbles(bubbleArray);
+  }
+}
+
+function lookup(iata) {
+  value = -1;
+  citiesData.data.forEach(function (d) {
+    if (d.iata == iata) {
+      longitude = d.lon
+      latitude = d.lat
+      value = [longitude, latitude]
+      return value;
+    }
+  });
+  return value;
+}
+
+function drawBubbles(bubbleArray) {
+  demandPoints = [];
+    bubbleArray.data.forEach(function(d) {
+        coords = lookup(d['destairport']);
+        demandPoints.push({"iata" : d['destairport'], 
+        "lon" : coords[0],
+        "lat" : coords[1],
+        "cpe" : +d['cpe'],
+        "demand" : +d['demandnew'] });
+      });
+
+    svg.selectAll(".bubble")
+      .data(demandPoints)
+      .enter().append("circle")
+      .attr("class", "bubble")
+      .attr("transform", function(d) {
+      return "translate(" + projection([
+        d.lon, //longitude
+        d.lat //latitude 
+        ]) + ")"})
+      .attr("r", function(d) {return rscale(d.demand);})
+      .style("fill", function(d) {return color(d.cpe);});
 }
 
 function httpGet(url, callback, carryout) {
@@ -458,7 +513,6 @@ function httpRequest(request, url, data, callback, carryout) {
 
 
 function updateRoutes(selection) {
-  console.log(fuelNew)
    links = [];
 
     citiesData.data.forEach(function(d) {
@@ -528,11 +582,14 @@ function updateRoutes(selection) {
         .attr("stop-color", "#fff");
 
 
-    // console.log(airportData[selection].connections)
 
     demands = {"data": []}
 
+    var count = airportData[selection].connections.length;
+    var done = false;
+
     airportData[selection].connections.forEach(function(d) {
+      count --;
       //all of the cities connected to the selected airport.
 
       demandnew = 0
@@ -553,6 +610,9 @@ function updateRoutes(selection) {
       //step 5: get month
       curmonth = 4
 
+      if (count == 0)
+        done = true;
+
       // SAVE THIS TO A VARIABLE
 
       // loaded = false
@@ -562,17 +622,11 @@ function updateRoutes(selection) {
       //     loaded = true;
       // }
 
-      // console.log(demandnew)
-
       //RUN AGAIN FOR OLD DEMAND
-      console.log(distance)
       if (distance > 0) {
-        httpPost("nnet", {"array": [parseFloat(distance)/6089,parseFloat(orgairport)/16647,parseFloat(destairport)/16647,parseFloat(curyear)/2016,parseFloat(curmonth)/12,parseFloat(fuelNew)/200]}, exampleCallback, {'distance': distance, 'orgairport': orgairport, 'destairport': destairport, 'userYear': userYear, 'userMonth': userMonth})
+        httpPost("nnet", {"array": [parseFloat(distance)/6089,parseFloat(orgairport)/16647,parseFloat(destairport)/16647,parseFloat(curyear)/2016,parseFloat(curmonth)/12,parseFloat(fuelNew)/200]}, exampleCallback, {'distance': distance, 'orgairport': orgairport, 'destairport': destairport, 'userYear': userYear, 'userMonth': userMonth, 'done': done})
       }
 
-      // console.log(demandold)
-
-      // console.log(demandnew)
 
       //demands.data.push([d, dmd])
 
@@ -581,6 +635,8 @@ function updateRoutes(selection) {
       // httpPost("nnet", {"array": [distance,orgairport,destairport,userYear,userMonth,9]}, exampleCallback)
 
     });
+
+
     // distance, origin, destination, year, month, fuel price
     // httpPost("nnet", {"array": [844,12266,12339,674,2015,9]}, exampleCallback)
 
@@ -612,32 +668,22 @@ function updateRoutes(selection) {
       // .style("fill", function(d) {return color(CrossPriceElasticity(d.demand));});
       //   });
 
-    temparr = {"data" : []};
-    demands.data.forEach(function(d) {
-      if (filterIATA.origin.indexOf(d[0]) > -1) {
-        // if(citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lon > -1000) { //condition weeds out the airports that didnt have available lon/lat data
-        temparr.data.push({"iata": d[0],
-                            "demand": +d[1]});
-      // }
-    }
-  }); 
-
-    console.log(temparr)
 
     demandPoints = [];
-      temparr.data.forEach(function(d) {
-          demandPoints.push({"iata" : d[0], 
-          "lon" : (function(d) {
-            if (citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lon > -1000) {
-              return +citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lon}
-            }),
-          "lat" : (function(d) {
-            if (citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lat > -1000) {
-              return +citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lat}
-            }),
-          "demand" : +d[1] });
-        });
+    // bubbleArray.data.forEach(function(d) {
+    //     demandPoints.push({"iata" : d[0], 
+    //     "lon" : (function(d) {
+    //       if (citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lon > -1000) {
+    //         return +citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lon}
+    //       }),
+    //     "lat" : (function(d) {
+    //       if (citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lat > -1000) {
+    //         return +citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lat}
+    //       }),
+    //     "demand" : +d[1] });
+    //   });
 
+    //console.log(demandPoints)
 
     svg.selectAll(".bubble")
       .data(demandPoints)
@@ -649,15 +695,14 @@ function updateRoutes(selection) {
         d.lat //latitude 
         ]) + ")"})
       .attr("r", function(d) {return rscale(d.demand);})
-      .style("fill", function(d) {return color(CrossPriceElasticity(d.demand));});
+      .style("fill", function(d) {return color(d.demand);});
         });
 
 
 }
 
-function CrossPriceElasticity(demandOld, demandNew){ 
+function CrossPriceElasticity(demandOld, demandNew, fuelOld){ 
         // demandOld = 0.5 //use the userYear and userMonth to index the proper values
-        fuelOld = 34.6
         var cpe = ((demandNew-demandOld)/demandOld)/((fuelNew-fuelOld)/fuelOld)
         return cpe
     } 
@@ -673,7 +718,6 @@ d3.select(e)
     clearRoutes();
     updateRoutes(selection);
 });
-
 
 
 });
