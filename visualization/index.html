@@ -91,9 +91,6 @@ path {
 
 <script>
 
-var demandnew = 0.0
-var demandold = 0.0
-
 var width = 960,
     height = 500;
 
@@ -130,9 +127,9 @@ var color = d3.scale.linear()
 color.clamp(true); //make domain values outside domain go to closest endpoint
 
 
-var userMonth = 0
-var userYear = 0
-var fuelNew = 1
+var userMonth = 6
+var userYear = 2010
+var fuelNew = 50
 
 var yearSlider = d3.slider().axis(true).min(2005).max(2015).step(1)
 .value(2010)
@@ -147,7 +144,7 @@ var monthSlider = d3.slider().axis(true).min(1).max(12).step(1)
     userMonth = value
   });
 
-var fuelSlider = d3.slider().axis(true).min(0).max(100)
+var fuelSlider = d3.slider().axis(true).min(0).max(200)
 .value(50)
 .on("slide", function(evt, value) {
     fuelNew = value
@@ -234,14 +231,7 @@ var filterIATA = {"origin": []};
   d3.csv("../data/airportids.csv", function(error, mapdata) {
     if (error) throw error; 
     mapdata.forEach(function(d){
-      //console.log(d['ID']);
       IDmap[d['IATA']] = d['ID'];
-      /*
-      IDmap.push({
-        key:   d.IATA,
-        value: d.ID
-      });
-      */
     });
   });
  
@@ -251,12 +241,15 @@ var filterIATA = {"origin": []};
     if (error) throw error; 
     distdata.forEach(function(d){
       dist[d['ORG'].concat(d['DEST'])] = d['DIST'];
-      /*
-      IDmap.push({
-        key:   d.IATA,
-        value: d.ID
-      });
-      */
+    });
+  });
+
+  var fuels = {};
+  // get old fuel prices
+  d3.csv("../data/DCOILWTICO.csv", function(error, mapdata) {
+    if (error) throw error; 
+    mapdata.forEach(function(d){
+      fuels[d['MONTH'].concat(d['YEAR'])] = d['VALUE']
     });
   });
 
@@ -411,18 +404,23 @@ legend.append("text")
 
 
 
-function exampleCallback(data) {
+function exampleCallback(data, carry) {
     data = JSON.parse(data)
-    var demandold = parseFloat(data.predicition)
-
-    httpPost("nnet", {"array": [parseFloat(distance)/6089,parseFloat(orgairport)/16647,parseFloat(destairport)/16647,parseFloat(curyear)/2016,parseFloat(curmonth)/12,parseFloat(fuelNew)/100]}, anothercallback, demandold)
+    var demandnew = parseFloat(data.predicition)
+    // should take in old fuel
+    oldfuel = fuels[String(carry['userMonth']).concat(String(carry['userYear']))]
+    console.log(oldfuel)
+    // THIS IS THE OLD DEMAND
+    if (carry['distance'] > 0) {
+      httpPost("nnet", {"array": [parseFloat(carry['distance'])/6089,parseFloat(carry['orgairport'])/16647,parseFloat(carry['destairport'])/16647,parseFloat(carry['userYear'])/2016,parseFloat(carry['userMonth'])/12,parseFloat(oldfuel)/200]}, anothercallback, demandnew)
+    }
     
 }
 
 function anothercallback(data, carry) {
   data = JSON.parse(data)
-  var demandnew = parseFloat(data.predicition) 
-  var demandold = carry
+  var demandold = parseFloat(data.predicition) 
+  var demandnew = carry
 
   console.log(CrossPriceElasticity(demandold, demandnew))
 }
@@ -567,7 +565,10 @@ function updateRoutes(selection) {
       // console.log(demandnew)
 
       //RUN AGAIN FOR OLD DEMAND
-      httpPost("nnet", {"array": [parseFloat(distance)/6089,parseFloat(orgairport)/16647,parseFloat(destairport)/16647,parseFloat(userYear)/2015,parseFloat(userMonth)/12,parseFloat(fuelNew)/100]}, exampleCallback)
+      console.log(distance)
+      if (distance > 0) {
+        httpPost("nnet", {"array": [parseFloat(distance)/6089,parseFloat(orgairport)/16647,parseFloat(destairport)/16647,parseFloat(curyear)/2016,parseFloat(curmonth)/12,parseFloat(fuelNew)/200]}, exampleCallback, {'distance': distance, 'orgairport': orgairport, 'destairport': destairport, 'userYear': userYear, 'userMonth': userMonth})
+      }
 
       // console.log(demandold)
 
