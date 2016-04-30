@@ -35,22 +35,23 @@ path {
 
 .bubble {
   fill-opacity: .5;
-  stroke: none; /*#fff*/
-  stroke-width: none; /*.5px;*/
+  stroke: #000; /*#fff*/
+  stroke-width: .1px; /*.5px;*/
 }
 
 .bubble :hover {
   stroke: #000;
 }
 
-.legend circle {
+.rlegend {
   fill: none;
-  stroke: #ccc;
+  stroke: #777;
+  stroke-width: .5px;
 }
 
-.legend text {
+.rlegend text {
   fill: #777;
-  font: 10px sans-serif;
+  font: 8px sans-serif;
   text-anchor: middle;
 }
 
@@ -74,11 +75,11 @@ path {
 <body>
 <img src="./icons/airport.svg", width="30", height="30">
 <div id="airportSelect" style="margin-bottom:15px;margin-top:15px"></div>
-<img src="./icons/year.svg", width="30", height="30"> Year:
+<img src="./icons/year.svg", width="30", height="30"> Fuel Index Year:
 <div id="slider" class="slider" style="margin-bottom:30px;margin-top:7px;"></div>
-<img src="./icons/month.svg", width="30", height="30"> Month:
+<img src="./icons/month.svg", width="30", height="30"> Fuel Index Month:
 <div id="slider2" class="slider" style="margin-bottom:30px;margin-top:7px;"></div>
-<img src="./icons/fuel.svg", width="30", height="30"> Projected Fuel Price:
+<img src="./icons/fuel.svg", width="30", height="30"> Projected Fuel Price (USD/bbl):
 <div id="slider3" class="slider" style="margin-bottom:30px;margin-top:7px;"></div>
 
 
@@ -107,7 +108,7 @@ var svg = d3.select("body").append("svg")
     .attr("height", height);
 
 var rscale = d3.scale.linear()
-  //.domain([0,1])
+  .domain([0,1])
   .range([5,30]);
 
 
@@ -120,8 +121,8 @@ defs.append("filter")
 
 
 var color = d3.scale.linear()
-    .domain([-1,-0.666,-0.333,0,0.333,0.666,1])
-    .range(["#b2182b","#ef8a62","#fddbc7","#f7f7f7","#d1e5f0","#67a9cf","#2166ac"]);
+    .domain([-1/5,-0.777/5, -0.555/5, -0.333/5, -0.111/5, 0.111/5, 0.333/5, 0.555/5, 0.777/5, 1/5])
+    .range(['#a50026','#d73027','#f46d43','#fdae61','#fee090','#e0f3f8','#abd9e9','#74add1','#4575b4','#313695']);
     //dark red to light red to mostly white to light blue to dark blue
 
 color.clamp(true); //make domain values outside domain go to closest endpoint
@@ -133,28 +134,50 @@ var fuelNew = 50
 
 var yearSlider = d3.slider().axis(true).min(2005).max(2015).step(1)
 .value(2010)
-.on("slide", function(evt, value) {
-    userYear = value
-  });
 
 
 var monthSlider = d3.slider().axis(true).min(1).max(12).step(1)
 .value(6)
-.on("slide", function(evt, value) {
-    userMonth = value
-  });
 
 var fuelSlider = d3.slider().axis(true).min(0).max(200)
 .value(50)
-.on("slide", function(evt, value) {
-    fuelNew = value
-  });
 
 
 
 var sliderdiv = d3.select('#slider').call(yearSlider);
 var sliderdiv2 = d3.select('#slider2').call(monthSlider);
 var sliderdiv3 = d3.select('#slider3').call(fuelSlider);
+
+
+var legend = [-1/5,-0.777/5, -0.555/5, -0.333/5, -0.111/5, 0.111/5, 0.333/5, 0.555/5, 0.777/5, 1/5]
+ svg.selectAll(".legend")
+  .data(legend)
+  .enter().append("circle", ".legend")
+    .attr("fill-opacity", "1")
+    .attr("r", 5) 
+    .style("fill", function(d) {return color(d)})
+    .attr("cy",function(d,i) { return 20 + i+0.25+"em"})
+    .attr("cx", 840);
+
+  svg.selectAll(".legend")
+    .data([1])
+    .enter().append("text")
+    .text("Cross Price Elasticity")
+    .attr("font-size", "13px")
+    .attr("y", "24em")
+    .style("font", "sans-serif")
+    .attr("x", 835)
+
+
+
+  svg.selectAll(".legend")
+   .data(legend)
+   .enter().append("text", ".legend")
+   .attr("font", "sans-serif")
+   .text(function(d) {return d3.format(".2f")(d)})
+   .attr("font-size", "13px")
+   .attr("y",function(d,i) { return 25.2 + i*1.24+"em"})
+   .attr("x",850)
 
 
 function setFuelPrice(){
@@ -259,8 +282,6 @@ var filterIATA = {"origin": []};
 //this bit loads in all possible airports in the US 
   d3.json("mapFiles/airports.json", function(error, data) {
   if (error) throw error;
-
- // var filterIATA = ["ATL", "JFK", "ORD", "SFO", "LAX", "SLC", "MSP", "DTW", "HOU", "SEA", "HNL", "ANC", "DAL", "LGA", "MIA"]
 
   
   //checks to see if part of the analyzed airports and creates citiesData array from the filtered results
@@ -388,21 +409,26 @@ var div = d3.select("body").append("div")
       return function(t) { return interpolate(t); };
   };
 
-// var legend = svg.append("g")
-//     .attr("class", "legend")
-//     .attr("transform", "translate(" + (width - 50) + "," + (height - 20) + ")")
-//   .selectAll("g")
-//     .data([0.25, .75, 1])
-//   .enter().append("g");
+var rlegend = svg.append("g")
+    .attr("class", "rlegend")
+    .attr("transform", "translate(" + (width - 50) + "," + (height - 20) + ")")
+  .selectAll("g")
+    .data([0.25, .75, 1])
+  .enter().append("g");
 
-// legend.append("circle")
-//     .attr("cy", function(d) { return -rscale(d); })
-//     .attr("r", rscale);
+rlegend.append("text")
+  .data([1])
+  .attr("y", -65)
+  .text("Load Factor")
 
-// legend.append("text")
-//     .attr("y", function(d) { return -2 * rscale(d); })
-//     .attr("dy", "1.3em")
-//     .text(d3.format("%"));
+rlegend.append("circle")
+    .attr("cy", function(d) { return -rscale(d); })
+    .attr("r", rscale);
+
+rlegend.append("text")
+    .attr("y", function(d) { return -2 * rscale(d); })
+    .attr("dy", "1.3em")
+    .text(d3.format("%"));
 
 
 
@@ -434,10 +460,9 @@ function anothercallback(data, carry) {
 
   var cpe = CrossPriceElasticity(demandold, demandnew, fuelold)
 
-  console.log(rscale(demandnew*100))
-
   bubbleArray.data.push({destairport, cpe, demandnew})
 
+  console.log(cpe)
   if (done) {
     drawBubbles(bubbleArray);
   }
@@ -512,7 +537,7 @@ function httpRequest(request, url, data, callback, carryout) {
 
 
 
-function updateRoutes(selection) {
+function changeLines(selection) {
    links = [];
 
     citiesData.data.forEach(function(d) {
@@ -553,33 +578,13 @@ function updateRoutes(selection) {
 
     //exit
     pathArcs.exit().remove();
+    updateRoutes(selection)
+}
 
-
+function updateRoutes(selection) {
+    svg.selectAll('.bubble').remove();
     d3.csv("mapFiles/output.csv", function(error, demands) {
       if (error) throw error; 
-
-    //demands = ["ATL", "JFK", "SFO", "MSP"];
-
-
-      // demandPoints = [];
-      // demands.forEach(function(d) {
-      //     demandPoints.push({"iata" : d.DEST, 
-      //     "lon" : citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d.DEST)].lon, 
-      //     "lat" : citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d.DEST)].lat,
-      //     "demand" : +d.DEMAND });
-      //   });
-
-
-
-    var radialGradient = svg.append("defs")
-        .append("radialGradient")
-        .attr("id", "radial-gradient")
-        .append("stop")
-        .attr("offset", "50%")
-        .attr("stop-color", "red")
-        .append("stop")
-        .attr("offset", "100%")
-        .attr("stop-color", "#fff");
 
 
 
@@ -613,14 +618,6 @@ function updateRoutes(selection) {
       if (count == 0)
         done = true;
 
-      // SAVE THIS TO A VARIABLE
-
-      // loaded = false
-
-      // while (loaded == false) {
-      //   if (demandnew != 0.0)
-      //     loaded = true;
-      // }
 
       //RUN AGAIN FOR OLD DEMAND
       if (distance > 0) {
@@ -628,62 +625,13 @@ function updateRoutes(selection) {
       }
 
 
-      //demands.data.push([d, dmd])
-
-      // var dmd = httpPost("nnet", {"array": [distance,orgairport,destairport,curyear,curmonth,fuelNew]}, exampleCallback)
-
-      // httpPost("nnet", {"array": [distance,orgairport,destairport,userYear,userMonth,9]}, exampleCallback)
 
     });
 
 
-    // distance, origin, destination, year, month, fuel price
-    // httpPost("nnet", {"array": [844,12266,12339,674,2015,9]}, exampleCallback)
-
-
-    // var radialGradient = svg.select("defs")
-    //     .selectAll("radialGradient").data(demandPoints).enter()
-    //     .append("radialGradient")
-    //     .append("stop")
-    //     .attr("offset", "0%")
-    //     .attr("stop-color", "red")
-    //     .append("stop")
-    //     .attr("offset", "100%")
-    //     .attr("stop-color", "#fff")
-    //     .attr('id', function(d) {return "radial-gradient"});
-
-      // console.log(CrossPriceElasticity(.78))
-      // console.log(color(CrossPriceElasticity(.78)))
-
-      // svg.selectAll(".bubble")
-      // .data(demandPoints)
-      // .enter().append("circle")
-      // .attr("class", "bubble")
-      // .attr("transform", function(d) {
-      // return "translate(" + projection([
-      //   d.lon, //longitude
-      //   d.lat //latitude 
-      //   ]) + ")"})
-      // .attr("r", function(d) {return rscale(d.demand);})
-      // .style("fill", function(d) {return color(CrossPriceElasticity(d.demand));});
-      //   });
 
 
     demandPoints = [];
-    // bubbleArray.data.forEach(function(d) {
-    //     demandPoints.push({"iata" : d[0], 
-    //     "lon" : (function(d) {
-    //       if (citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lon > -1000) {
-    //         return +citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lon}
-    //       }),
-    //     "lat" : (function(d) {
-    //       if (citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lat > -1000) {
-    //         return +citiesData.data[citiesData.data.map(function (element) {return element.iata;}).indexOf(d[0])].lat}
-    //       }),
-    //     "demand" : +d[1] });
-    //   });
-
-    //console.log(demandPoints)
 
     svg.selectAll(".bubble")
       .data(demandPoints)
@@ -714,10 +662,37 @@ function clearRoutes() {
 
 d3.select(e)
   .on('change', function() {
+    bubbleArray = {"data" : []}
     var selection = d3.select(this).property('value');
     clearRoutes();
-    updateRoutes(selection);
+    changeLines(selection);
 });
+
+  fuelSlider.on("slideend", function(evt, value) {
+    fuelNew = value
+    bubbleArray = {"data" : []}
+    var e = document.getElementById("mySelect");
+    var selection = e.options[e.selectedIndex].text;
+    updateRoutes(selection)
+  });
+
+monthSlider.on("slideend", function(evt, value) {
+    userMonth = value
+    bubbleArray = {"data" : []}
+    var e = document.getElementById("mySelect");
+    var selection = e.options[e.selectedIndex].text;
+    updateRoutes(selection)
+
+  });
+
+yearSlider.on("slideend", function(evt, value) {
+    userYear = value
+    bubbleArray = {"data" : []}
+    var e = document.getElementById("mySelect");
+    var selection = e.options[e.selectedIndex].text;
+    updateRoutes(selection)
+  });
+
 
 
 });
