@@ -441,8 +441,8 @@ function exampleCallback(data, carry) {
     // should take in old fuel
     oldfuel = fuels[String(carry['userMonth']).concat(String(carry['userYear']))]
     // THIS IS THE OLD DEMAND
-    newcarry = [demandnew, oldfuel, carry['destairport'], done]
-    if (carry['distance'] > 0) {
+    newcarry = [demandnew, oldfuel, carry['destairport'], done, carry['distance']]
+    if ((carry['distance'] > 0) || done) {
       httpPost("nnet", {"array": [parseFloat(carry['distance'])/6089,parseFloat(carry['orgairport'])/16647,parseFloat(carry['destairport'])/16647,parseFloat(carry['userYear'])/2016,parseFloat(carry['userMonth'])/12,parseFloat(oldfuel)/200]}, anothercallback, newcarry)
     }
     
@@ -457,12 +457,13 @@ function anothercallback(data, carry) {
   var fuelold = parseFloat(carry[1])
   var destairport = IATAmap[carry[2]]
   var done = carry[3]
+  var dist = carry[4]
 
   var cpe = CrossPriceElasticity(demandold, demandnew, fuelold)
 
-  bubbleArray.data.push({destairport, cpe, demandnew})
+  if (dist > 0)
+    bubbleArray.data.push({destairport, cpe, demandnew});
 
-  console.log(cpe)
   if (done) {
     drawBubbles(bubbleArray);
   }
@@ -615,12 +616,12 @@ function updateRoutes(selection) {
       //step 5: get month
       curmonth = 4
 
-      if (count == 0)
+      if (count == 0) {
         done = true;
-
+      }
 
       //RUN AGAIN FOR OLD DEMAND
-      if (distance > 0) {
+      if ((distance > 0) || (done)) {
         httpPost("nnet", {"array": [parseFloat(distance)/6089,parseFloat(orgairport)/16647,parseFloat(destairport)/16647,parseFloat(curyear)/2016,parseFloat(curmonth)/12,parseFloat(fuelNew)/200]}, exampleCallback, {'distance': distance, 'orgairport': orgairport, 'destairport': destairport, 'userYear': userYear, 'userMonth': userMonth, 'done': done})
       }
 
